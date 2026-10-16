@@ -945,6 +945,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "£ English (United Kingdom)" => "£ Tiếng Anh (Vương quốc Anh)",
         "¥ Japanese" => "¥ Tiếng Nhật",
         "€ Euro" => "€ Đồng Euro",
+        "₫ Vietnamese Dong" => "₫ Đồng Việt Nam",
         "Tab|Insert" => "Chèn",
         "AutoSave" => "Tự động lưu",
         "Insert\nSlicer" => "Chèn\nBộ cắt dữ liệu",

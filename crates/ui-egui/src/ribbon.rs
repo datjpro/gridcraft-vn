@@ -813,6 +813,7 @@ fn home(app: &mut SheetApp, ui: &mut Ui) {
                             json!({"code": "_-[$€-x-euro2] * #,##0.00_-;-[$€-x-euro2] * #,##0.00_-;_-[$€-x-euro2] * \"-\"??_-;_-@_-"}),
                         ),
                         ("¥ Japanese", "home.numberFormat", json!({"code": "_-[$¥-411]* #,##0_-;-[$¥-411]* #,##0_-;_-[$¥-411]* \"-\"_-;_-@_-"})),
+                        ("₫ Vietnamese Dong", "home.numberFormat", json!({"code": "#,##0 \"₫\";(#,##0 \"₫\");\"-\" \"₫\";@"})),
                         ("-", "", json!(null)),
                         ("More Accounting Formats…", "dialog:formatCells", json!({"tab": "Number"})),
                     ],
