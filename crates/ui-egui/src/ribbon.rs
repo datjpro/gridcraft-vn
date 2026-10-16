@@ -1027,6 +1027,8 @@ fn home(app: &mut SheetApp, ui: &mut Ui) {
             &[
                 ("Sort A to Z", "data.sortAscending", json!({})),
                 ("Sort Z to A", "data.sortDescending", json!({})),
+                ("Sort by Vietnamese Name (A to Z)", "data.sortVietnameseNameAscending", json!({})),
+                ("Sort by Vietnamese Name (Z to A)", "data.sortVietnameseNameDescending", json!({})),
                 ("Custom Sort…", "dialog:sort", json!({})),
                 ("-", "", json!(null)),
                 ("Filter", "data.filter", json!({})),

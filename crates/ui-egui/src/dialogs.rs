@@ -1935,10 +1935,14 @@ fn sort(app: &mut SheetApp, ui: &mut egui::Ui, d: &mut Dialog, confirm: &mut boo
                 .selected_text(match by.as_str() {
                     "cellColor" => "Cell Color",
                     "fontColor" => "Font Color",
+                    "vietnamese_name" => "Vietnamese Name (Tên)",
+                    "vietnamese" => "Vietnamese Alphabet",
                     _ => "Cell Values",
                 })
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut by, "values".into(), "Cell Values");
+                    ui.selectable_value(&mut by, "vietnamese_name".into(), "Vietnamese Name (Tên)");
+                    ui.selectable_value(&mut by, "vietnamese".into(), "Vietnamese Alphabet");
                     ui.selectable_value(&mut by, "cellColor".into(), "Cell Color");
                     ui.selectable_value(&mut by, "fontColor".into(), "Font Color");
                 });

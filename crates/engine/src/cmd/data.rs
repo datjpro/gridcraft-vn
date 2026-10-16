@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 use std::sync::Arc;
 
-use gridcraft_core::{CellRef, RangeRef, Value, sort_compare};
+use gridcraft_core::{CellRef, RangeRef, Value, compare_vietnamese_name, compare_vietnamese_text, sort_compare};
 use gridcraft_model::*;
 use serde_json::{Value as Json, json};
 
@@ -18,11 +18,47 @@ pub fn specs() -> Vec<CommandSpec> {
         )),
         cmd!("data.sortDescending", "Sort Z to A", ["Data", "Sort & Filter"], None, "{range?, column?}", has_doc, |s, p| quick_sort(s, p, false)),
         cmd!(
+            "data.sortVietnameseNameAscending",
+            "Sort by Vietnamese Name A to Z",
+            ["Data", "Sort & Filter"],
+            None,
+            "{range?, column?: \"B\"}",
+            has_doc,
+            |s, p| quick_sort_vn(s, p, true, true)
+        ),
+        cmd!(
+            "data.sortVietnameseNameDescending",
+            "Sort by Vietnamese Name Z to A",
+            ["Data", "Sort & Filter"],
+            None,
+            "{range?, column?: \"B\"}",
+            has_doc,
+            |s, p| quick_sort_vn(s, p, false, true)
+        ),
+        cmd!(
+            "data.sortVietnameseAscending",
+            "Sort Vietnamese A to Z",
+            ["Data", "Sort & Filter"],
+            None,
+            "{range?, column?: \"B\"}",
+            has_doc,
+            |s, p| quick_sort_vn(s, p, true, false)
+        ),
+        cmd!(
+            "data.sortVietnameseDescending",
+            "Sort Vietnamese Z to A",
+            ["Data", "Sort & Filter"],
+            None,
+            "{range?, column?: \"B\"}",
+            has_doc,
+            |s, p| quick_sort_vn(s, p, false, false)
+        ),
+        cmd!(
             "data.sort",
             "Sort…",
             ["Data", "Sort & Filter"],
             None,
-            "{range?, header?: bool, keys: [{column: \"B\", order: asc|desc, by?: values|cellColor|fontColor, customList?: [..]}], orientation?: rows|columns, matchCase?}",
+            "{range?, header?: bool, keys: [{column: \"B\", order: asc|desc, by?: values|vietnamese_name|vietnamese|cellColor|fontColor, customList?: [..]}], orientation?: rows|columns, matchCase?}",
             has_doc,
             sort
         ),
@@ -187,8 +223,18 @@ fn quick_sort(s: &mut Session, p: &Json, asc: bool) -> Result<Json> {
     let col = col_param(p.get("column"), r.start.col).unwrap_or(s.doc()?.selection.active.col).clamp(r.start.col, r.end.col);
     let d = s.doc()?;
     let sh = d.wb.active().ok_or(EngineError::NoDocument)?;
-    let header = guess_header(&d.wb, sh, r);
+    let header = bool_param(p, "header").unwrap_or_else(|| guess_header(&d.wb, sh, r));
     do_sort(s, r, header, vec![SortKey { col, desc: !asc, by: "values".into(), list: None }], false, false)
+}
+
+fn quick_sort_vn(s: &mut Session, p: &Json, asc: bool, by_name: bool) -> Result<Json> {
+    let r = data_range(s, p)?;
+    let col = col_param(p.get("column"), r.start.col).unwrap_or(s.doc()?.selection.active.col).clamp(r.start.col, r.end.col);
+    let d = s.doc()?;
+    let sh = d.wb.active().ok_or(EngineError::NoDocument)?;
+    let header = bool_param(p, "header").unwrap_or_else(|| guess_header(&d.wb, sh, r));
+    let by = if by_name { "vietnamese_name" } else { "vietnamese" };
+    do_sort(s, r, header, vec![SortKey { col, desc: !asc, by: by.into(), list: None }], false, false)
 }
 
 fn sort(s: &mut Session, p: &Json) -> Result<Json> {
@@ -272,7 +318,17 @@ fn do_sort(s: &mut Session, r: RangeRef, header: bool, keys: Vec<SortKey>, by_co
             for (ki, k) in keys.iter().enumerate() {
                 let (va, ca) = &keyed[a as usize][ki];
                 let (vb, cb) = &keyed[b as usize][ki];
-                let o = if k.by != "values" {
+                let o = if k.by == "vietnamese_name" {
+                    match (va.as_text(), vb.as_text()) {
+                        (Some(ta), Some(tb)) => compare_vietnamese_name(ta, tb),
+                        _ => sort_compare(va, vb),
+                    }
+                } else if k.by == "vietnamese" {
+                    match (va.as_text(), vb.as_text()) {
+                        (Some(ta), Some(tb)) => compare_vietnamese_text(ta, tb),
+                        _ => sort_compare(va, vb),
+                    }
+                } else if k.by != "values" {
                     ca.cmp(cb)
                 } else if let Some(list) = &k.list {
                     let pos = |v: &Value| v.as_text().and_then(|t| list.iter().position(|x| x.eq_ignore_ascii_case(t))).unwrap_or(usize::MAX);
@@ -1498,5 +1554,47 @@ mod tests {
         assert_eq!(split_delimited("a,b,,c", &[','], false, '"'), ["a", "b", "", "c"]);
         assert_eq!(split_delimited("a,b,,c", &[','], true, '"'), ["a", "b", "c"]);
         assert_eq!(split_delimited("\"x,y\",z", &[','], false, '"'), ["x,y", "z"]);
+    }
+
+    #[test]
+    fn vietnamese_sort_tests() {
+        let mut s = Session::new();
+        s.new_workbook();
+        s.execute("cell.set", json!({"cell": "A1", "input": "Họ và Tên"})).unwrap();
+        s.execute("cell.set", json!({"cell": "A2", "input": "Nguyễn Văn An"})).unwrap();
+        s.execute("cell.set", json!({"cell": "A3", "input": "Lê Thị Cúc"})).unwrap();
+        s.execute("cell.set", json!({"cell": "A4", "input": "Trần Văn Bình"})).unwrap();
+        s.execute("cell.set", json!({"cell": "A5", "input": "Đặng Thị Thu Hà"})).unwrap();
+
+        // Sort by Vietnamese given name A to Z
+        s.execute("data.sortVietnameseNameAscending", json!({"range": "A1:A5", "column": "A", "header": true})).unwrap();
+
+        let sh = s.doc().unwrap().wb.active().unwrap();
+        let get = |cell: &str| sh.cell(CellRef::parse(cell).unwrap()).unwrap().value.as_text().unwrap().to_string();
+        assert_eq!(get("A2"), "Nguyễn Văn An");
+        assert_eq!(get("A3"), "Trần Văn Bình");
+        assert_eq!(get("A4"), "Lê Thị Cúc");
+        assert_eq!(get("A5"), "Đặng Thị Thu Hà");
+
+        // Sort by Vietnamese given name Z to A
+        s.execute("data.sortVietnameseNameDescending", json!({"range": "A1:A5", "column": "A", "header": true})).unwrap();
+        let sh = s.doc().unwrap().wb.active().unwrap();
+        let get = |cell: &str| sh.cell(CellRef::parse(cell).unwrap()).unwrap().value.as_text().unwrap().to_string();
+        assert_eq!(get("A2"), "Đặng Thị Thu Hà");
+        assert_eq!(get("A3"), "Lê Thị Cúc");
+        assert_eq!(get("A4"), "Trần Văn Bình");
+        assert_eq!(get("A5"), "Nguyễn Văn An");
+
+        // Test Vietnamese alphabetical collation: Dũng < Đạt < Giang
+        s.execute("cell.set", json!({"cell": "B1", "input": "Tên"})).unwrap();
+        s.execute("cell.set", json!({"cell": "B2", "input": "Giang"})).unwrap();
+        s.execute("cell.set", json!({"cell": "B3", "input": "Dũng"})).unwrap();
+        s.execute("cell.set", json!({"cell": "B4", "input": "Đạt"})).unwrap();
+        s.execute("data.sortVietnameseAscending", json!({"range": "B1:B4", "column": "B", "header": true})).unwrap();
+        let sh = s.doc().unwrap().wb.active().unwrap();
+        let get = |cell: &str| sh.cell(CellRef::parse(cell).unwrap()).unwrap().value.as_text().unwrap().to_string();
+        assert_eq!(get("B2"), "Dũng");
+        assert_eq!(get("B3"), "Đạt");
+        assert_eq!(get("B4"), "Giang");
     }
 }
