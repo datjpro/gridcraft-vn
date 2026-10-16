@@ -8,7 +8,13 @@ use serde_json::json;
 
 use crate::{DocState, Session};
 
-pub const SAMPLES: &[(&str, &str)] = &[("budget", "Household Budget"), ("sales", "Quarterly Sales Dashboard"), ("grades", "Gradebook")];
+pub const SAMPLES: &[(&str, &str)] = &[
+    ("budget", "Household Budget"),
+    ("sales", "Quarterly Sales Dashboard"),
+    ("grades", "Gradebook"),
+    ("phieuthu", "Sổ Quỹ Thu Chi (Kế Toán)"),
+    ("bangdiem", "Bảng Điểm Học Sinh"),
+];
 
 pub fn title(name: &str) -> String {
     SAMPLES.iter().find(|(n, _)| *n == name).map(|(_, t)| t.to_string()).unwrap_or_else(|| "Sample".into())
@@ -23,6 +29,8 @@ pub fn build(name: &str) -> Option<Workbook> {
             "budget" => "Budget".into(),
             "sales" => "Sales".into(),
             "grades" => "Grades".into(),
+            "phieuthu" => "ThuChi".into(),
+            "bangdiem" => "BangDiem".into(),
             _ => return None,
         };
     }
@@ -31,6 +39,8 @@ pub fn build(name: &str) -> Option<Workbook> {
         "budget" => budget(&mut s),
         "sales" => sales(&mut s),
         "grades" => grades(&mut s),
+        "phieuthu" => phieuthu(&mut s),
+        "bangdiem" => bangdiem(&mut s),
         _ => false,
     };
     if !ok {
@@ -203,6 +213,69 @@ fn grades(s: &mut Session) -> bool {
         json!({"range": "G2:G9", "rule": {"type": "cellIs", "operator": "equal", "value": "A", "preset": "greenFillDarkGreenText"}}),
     );
     ok &= run(s, "home.conditionalFormat", json!({"range": "F2:F9", "rule": {"type": "dataBar", "color": "#63BE7B"}}));
+    ok
+}
+
+fn phieuthu(s: &mut Session) -> bool {
+    let rows = json!([
+        ["SỔ QUỸ TIỀN MẶT & THEO DÕI THU CHI", "", "", "", "", ""],
+        ["Ngày", "Số CT", "Diễn giải", "Thu (VNĐ)", "Chi (VNĐ)", "Tồn quỹ (VNĐ)"],
+        ["2026-10-01", "PT001", "Số dư đầu kỳ mang sang", 50000000, 0, 50000000],
+        ["2026-10-03", "PT002", "Thu tiền bán hàng đợt 1", 15000000, 0, 65000000],
+        ["2026-10-05", "PC001", "Chi thanh toán tiền điện nước", 0, 3200000, 61800000],
+        ["2026-10-08", "PC002", "Chi mua văn phòng phẩm", 0, 1850000, 59950000],
+        ["2026-10-12", "PT003", "Thu hồi tạm ứng công tác", 2500000, 0, 62450000],
+        ["2026-10-15", "PC003", "Tạm ứng chi phí tiếp khách", 0, 5000000, 57450000],
+        ["Tổng cộng", "", "", "=SUM(D3:D8)", "=SUM(E3:E8)", "=F8"],
+        ["Số tiền bằng chữ:", "", "=DOCSO(F9, \"đồng chẵn\")", "", "", ""]
+    ]);
+    let mut ok = run(s, "range.setValues", json!({"range": "A1", "values": rows}));
+    ok &= run(s, "home.bold", json!({"range": "A1:F2"}));
+    ok &= run(s, "home.bold", json!({"range": "A9:F10"}));
+    ok &= run(s, "home.mergeCells", json!({"range": "A1:F1"}));
+    ok &= run(s, "home.mergeCells", json!({"range": "A10:B10"}));
+    ok &= run(s, "home.mergeCells", json!({"range": "C10:F10"}));
+    ok &= run(s, "home.numberFormat", json!({"range": "D3:F9", "code": "#,##0 \"₫\""}));
+    ok &= run(s, "insert.table", json!({"range": "A2:F8", "style": "TableStyleLight9", "name": "SoQuy"}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "A:A", "width": 110}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "B:B", "width": 80}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "C:C", "width": 240}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "D:F", "width": 140}));
+    ok
+}
+
+fn bangdiem(s: &mut Session) -> bool {
+    let rows = json!([
+        ["BẢNG TỔNG HỢP ĐIỂM ĐÁNH GIÁ HỌC SINH", "", "", "", "", "", ""],
+        ["Họ và Tên", "Điểm Miệng", "15 Phút", "Giữa Kỳ", "Cuối Kỳ", "Điểm TB", "Xếp Loại"],
+        ["Nguyễn Văn An", 8.5, 8.0, 9.0, 8.5],
+        ["Trần Văn Bình", 7.0, 7.5, 8.0, 7.5],
+        ["Lê Thị Cúc", 9.0, 9.5, 9.0, 9.5],
+        ["Phạm Quốc Dũng", 6.5, 7.0, 6.0, 6.5],
+        ["Đặng Thị Thu Hà", 9.5, 10.0, 9.5, 10.0],
+        ["Hoàng Kim Ngân", 8.0, 8.5, 8.0, 8.5],
+        ["Vũ Minh Tuấn", 5.5, 6.0, 5.5, 6.0]
+    ]);
+    let mut ok = run(s, "range.setValues", json!({"range": "A1", "values": rows}));
+    ok &= run(s, "home.bold", json!({"range": "A1:G2"}));
+    ok &= run(s, "home.mergeCells", json!({"range": "A1:G1"}));
+    for r in 3..=9 {
+        ok &= run(s, "cell.set", json!({"cell": format!("F{r}"), "input": format!("=AVERAGE(B{r}:E{r})")}));
+        ok &= run(
+            s,
+            "cell.set",
+            json!({"cell": format!("G{r}"), "input": format!("=IFS(F{r}>=8.0,\"Giỏi\",F{r}>=6.5,\"Khá\",F{r}>=5.0,\"Trung bình\",TRUE,\"Chưa đạt\")")}),
+        );
+    }
+    ok &= run(s, "home.numberFormat", json!({"range": "B3:F9", "code": "0.0"}));
+    ok &= run(s, "insert.table", json!({"range": "A2:G9", "style": "TableStyleLight9", "name": "BangDiem"}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "A:A", "width": 160}));
+    ok &= run(s, "home.columnWidth", json!({"cols": "B:G", "width": 100}));
+    ok &= run(
+        s,
+        "home.conditionalFormat",
+        json!({"range": "G3:G9", "rule": {"type": "cellIs", "operator": "equal", "value": "Giỏi", "preset": "greenFillDarkGreenText"}}),
+    );
     ok
 }
 
