@@ -765,8 +765,162 @@ fn regexreplace(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
     check_len(out)
 }
 
+fn remove_vietnamese_tone_char(c: char) -> char {
+    match c {
+        'a' | 'à' | 'á' | 'ả' | 'ã' | 'ạ' | 'ă' | 'ằ' | 'ắ' | 'ẳ' | 'ẵ' | 'ặ' | 'â' | 'ầ' | 'ấ' | 'ẩ' | 'ẫ' | 'ậ' => 'a',
+        'A' | 'À' | 'Á' | 'Ả' | 'Ã' | 'Ạ' | 'Ă' | 'Ằ' | 'Ắ' | 'Ẳ' | 'Ẵ' | 'Ặ' | 'Â' | 'Ầ' | 'Ấ' | 'Ẩ' | 'Ẫ' | 'Ậ' => 'A',
+        'd' | 'đ' => 'd',
+        'D' | 'Đ' => 'D',
+        'e' | 'è' | 'é' | 'ẻ' | 'ẽ' | 'ẹ' | 'ê' | 'ề' | 'ế' | 'ể' | 'ễ' | 'ệ' => 'e',
+        'E' | 'È' | 'É' | 'Ẻ' | 'Ẽ' | 'Ẹ' | 'Ê' | 'Ề' | 'Ế' | 'Ể' | 'Ễ' | 'Ệ' => 'E',
+        'i' | 'ì' | 'í' | 'ỉ' | 'ĩ' | 'ị' => 'i',
+        'I' | 'Ì' | 'Í' | 'Ỉ' | 'Ĩ' | 'Ị' => 'I',
+        'o' | 'ò' | 'ó' | 'ỏ' | 'õ' | 'ọ' | 'ô' | 'ồ' | 'ố' | 'ổ' | 'ỗ' | 'ộ' | 'ơ' | 'ờ' | 'ớ' | 'ở' | 'ỡ' | 'ợ' => 'o',
+        'O' | 'Ò' | 'Ó' | 'Ỏ' | 'Õ' | 'Ọ' | 'Ô' | 'Ồ' | 'Ố' | 'Ổ' | 'Ỗ' | 'Ộ' | 'Ơ' | 'Ờ' | 'Ớ' | 'Ở' | 'Ỡ' | 'Ợ' => 'O',
+        'u' | 'ù' | 'ú' | 'ủ' | 'ũ' | 'ụ' | 'ư' | 'ừ' | 'ứ' | 'ử' | 'ữ' | 'ự' => 'u',
+        'U' | 'Ù' | 'Ú' | 'Ủ' | 'Ũ' | 'Ụ' | 'Ư' | 'Ừ' | 'Ứ' | 'Ử' | 'Ữ' | 'Ự' => 'U',
+        'y' | 'ỳ' | 'ý' | 'ỷ' | 'ỹ' | 'ỵ' => 'y',
+        'Y' | 'Ỳ' | 'Ý' | 'Ỷ' | 'Ỹ' | 'Ỵ' => 'Y',
+        other => other,
+    }
+}
+
+fn khongdau_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    let result: String = s.chars().map(remove_vietnamese_tone_char).collect();
+    check_len(result)
+}
+
+fn read_3digits(n: u64, show_hundred: bool) -> String {
+    let hundred = (n / 100) % 10;
+    let ten = (n % 100) / 10;
+    let unit = n % 10;
+    let digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+    let mut parts: Vec<&str> = Vec::new();
+
+    if hundred > 0 || show_hundred {
+        if let Some(&d) = digits.get(hundred as usize) {
+            parts.push(d);
+            parts.push("trăm");
+        }
+    }
+
+    if ten > 1 {
+        if let Some(&d) = digits.get(ten as usize) {
+            parts.push(d);
+            parts.push("mươi");
+        }
+        if unit == 1 {
+            parts.push("mốt");
+        } else if unit == 5 {
+            parts.push("lăm");
+        } else if unit > 0 {
+            if let Some(&d) = digits.get(unit as usize) {
+                parts.push(d);
+            }
+        }
+    } else if ten == 1 {
+        parts.push("mười");
+        if unit == 5 {
+            parts.push("lăm");
+        } else if unit > 0 {
+            if let Some(&d) = digits.get(unit as usize) {
+                parts.push(d);
+            }
+        }
+    } else {
+        // ten == 0
+        if (hundred > 0 || show_hundred) && unit > 0 {
+            parts.push("lẻ");
+            if let Some(&d) = digits.get(unit as usize) {
+                parts.push(d);
+            }
+        } else if unit > 0 || (!show_hundred && hundred == 0 && ten == 0) {
+            if let Some(&d) = digits.get(unit as usize) {
+                parts.push(d);
+            }
+        }
+    }
+
+    parts.join(" ")
+}
+
+fn docso_vietnamese(num: f64) -> Result<String, CellError> {
+    if num.is_nan() || num.is_infinite() {
+        return Err(CellError::Num);
+    }
+    if num.abs() >= 1e15 {
+        return Err(CellError::Num);
+    }
+
+    let is_negative = num < 0.0;
+    let integer_part = num.abs().round() as u64;
+
+    if integer_part == 0 {
+        return Ok("Không".to_string());
+    }
+
+    let scales = ["", "nghìn", "triệu", "tỷ", "nghìn tỷ", "triệu tỷ"];
+    let mut chunks: Vec<u64> = Vec::new();
+    let mut temp = integer_part;
+    while temp > 0 {
+        chunks.push(temp % 1000);
+        temp /= 1000;
+    }
+
+    let mut words: Vec<String> = Vec::new();
+    for (i, &chunk) in chunks.iter().enumerate().rev() {
+        if chunk > 0 {
+            let show_hundred = i < chunks.len() - 1;
+            let chunk_str = read_3digits(chunk, show_hundred);
+            if !chunk_str.is_empty() {
+                words.push(chunk_str);
+                let scale = scales.get(i).copied().unwrap_or("");
+                if !scale.is_empty() {
+                    words.push(scale.to_string());
+                }
+            }
+        }
+    }
+
+    let mut result = words.join(" ");
+    if is_negative {
+        result = format!("âm {result}");
+    }
+
+    let mut chars = result.chars();
+    let capitalized = match chars.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+    };
+
+    Ok(capitalized)
+}
+
+fn docso_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let n = num(a, 0)?;
+    let suffix = if a.len() > 1 {
+        text(a, 1)?
+    } else {
+        "đồng chẵn".to_string()
+    };
+
+    let text_num = docso_vietnamese(n)?;
+    let result = if suffix.trim().is_empty() {
+        text_num
+    } else {
+        format!("{text_num} {}", suffix.trim())
+    };
+
+    check_len(result)
+}
+
 pub(crate) fn specs() -> Vec<FnSpec> {
     vec![
+        f!("DOCSO", 1, 2, Text, S, "DOCSO(number, [suffix])", "Đọc số thành chữ tiếng Việt (mặc định thêm 'đồng chẵn').", docso_fn),
+        f!("VND_TEXT", 1, 2, Text, S, "VND_TEXT(number, [suffix])", "Đọc số thành chữ tiếng Việt (bí danh của DOCSO).", docso_fn),
+        f!("KHONGDAU", 1, 1, Text, S, "KHONGDAU(text)", "Chuyển chuỗi tiếng Việt có dấu thành không dấu.", khongdau_fn),
+        f!("REMOVE_TONE", 1, 1, Text, S, "REMOVE_TONE(text)", "Chuyển chuỗi tiếng Việt có dấu thành không dấu (bí danh của KHONGDAU).", khongdau_fn),
         f!("CONCATENATE", 1, VAR, Text, S, "CONCATENATE(text1, [text2], ...)", "Joins several text values into one.", concatenate),
         f!("CONCAT", 1, VAR, Text, A, "CONCAT(text1, [text2], ...)", "Joins text from values and every cell of ranges, without a separator.", concat),
         f!(
@@ -1185,5 +1339,17 @@ mod tests {
         is_text(ev("REGEXREPLACE", vec![t("a1b22c"), t("[0-9]+"), t("#"), n(-2.0)]), "a#b22c");
         is_text(ev("REGEXREPLACE", vec![t("John Smith"), t("(\\w+) (\\w+)"), t("$2, $1")]), "Smith, John");
         is_text(ev("REGEXREPLACE", vec![t("ab"), t("(a)"), t("$1x")]), "axb");
+    }
+
+    #[test]
+    fn vietnamese_functions() {
+        is_text(ev("KHONGDAU", vec![t("Nguyễn Văn An")]), "Nguyen Van An");
+        is_text(ev("REMOVE_TONE", vec![t("Đại học Quốc gia TP.HCM")]), "Dai hoc Quoc gia TP.HCM");
+        is_text(ev("DOCSO", vec![n(0.0)]), "Không đồng chẵn");
+        is_text(ev("DOCSO", vec![n(1250000.0)]), "Một triệu hai trăm năm mươi nghìn đồng chẵn");
+        is_text(ev("DOCSO", vec![n(15.0), t("đồng")]), "Mười lăm đồng");
+        is_text(ev("DOCSO", vec![n(21.0), t("")]), "Hai mươi mốt");
+        is_text(ev("VND_TEXT", vec![n(105.0), t("VND")]), "Một trăm lẻ năm VND");
+        is_text(ev("DOCSO", vec![n(-50000.0)]), "Âm năm mươi nghìn đồng chẵn");
     }
 }
