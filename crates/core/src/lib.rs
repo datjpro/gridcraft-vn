@@ -7,7 +7,12 @@ pub mod addr;
 pub mod date;
 pub mod parse;
 pub mod value;
+pub mod vietnamese;
 
 pub use addr::{CellRef, MAX_COLS, MAX_ROWS, RangeRef, col_to_letters, letters_to_col};
 pub use date::DateSystem;
 pub use value::{Array, CellError, Value, compare, compare_numbers, compare_text, number_to_text, sort_compare};
+pub use vietnamese::{
+    compare_vietnamese_name, compare_vietnamese_text, extract_vietnamese_first_name, extract_vietnamese_last_name, proper_vietnamese,
+    tcvn3_to_unicode, unicode_to_tcvn3,
+};

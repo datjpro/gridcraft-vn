@@ -1,7 +1,10 @@
 //! Text functions.
 
 use gridcraft_core::parse::parse_number_text_in;
-use gridcraft_core::{CellError, Value, number_to_text};
+use gridcraft_core::{
+    CellError, Value, extract_vietnamese_first_name, extract_vietnamese_last_name, number_to_text, proper_vietnamese, tcvn3_to_unicode,
+    unicode_to_tcvn3,
+};
 
 use crate::criteria::wildcard_find;
 use crate::util::{
@@ -915,12 +918,45 @@ fn docso_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
     check_len(result)
 }
 
+fn tachten_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    check_len(extract_vietnamese_first_name(&s))
+}
+
+fn tachho_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    check_len(extract_vietnamese_last_name(&s))
+}
+
+fn proper_vn_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    check_len(proper_vietnamese(&s))
+}
+
+fn tcvn3_to_unicode_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    check_len(tcvn3_to_unicode(&s))
+}
+
+fn unicode_to_tcvn3_fn(a: &[Arg], _c: &mut dyn Ctx) -> R<Value> {
+    let s = text(a, 0)?;
+    check_len(unicode_to_tcvn3(&s))
+}
+
 pub(crate) fn specs() -> Vec<FnSpec> {
     vec![
         f!("DOCSO", 1, 2, Text, S, "DOCSO(number, [suffix])", "Đọc số thành chữ tiếng Việt (mặc định thêm 'đồng chẵn').", docso_fn),
         f!("VND_TEXT", 1, 2, Text, S, "VND_TEXT(number, [suffix])", "Đọc số thành chữ tiếng Việt (bí danh của DOCSO).", docso_fn),
         f!("KHONGDAU", 1, 1, Text, S, "KHONGDAU(text)", "Chuyển chuỗi tiếng Việt có dấu thành không dấu.", khongdau_fn),
         f!("REMOVE_TONE", 1, 1, Text, S, "REMOVE_TONE(text)", "Chuyển chuỗi tiếng Việt có dấu thành không dấu (bí danh của KHONGDAU).", khongdau_fn),
+        f!("TACHTEN", 1, 1, Text, S, "TACHTEN(text)", "Tách phần Tên chính trong chuỗi Họ và Tên người Việt.", tachten_fn),
+        f!("GET_FIRST_NAME", 1, 1, Text, S, "GET_FIRST_NAME(text)", "Tách phần Tên chính trong chuỗi Họ và Tên người Việt (bí danh của TACHTEN).", tachten_fn),
+        f!("TACHHO", 1, 1, Text, S, "TACHHO(text)", "Tách phần Họ và Tên đệm trong chuỗi Họ và Tên người Việt.", tachho_fn),
+        f!("GET_LAST_NAME", 1, 1, Text, S, "GET_LAST_NAME(text)", "Tách phần Họ và Tên đệm trong chuỗi Họ và Tên người Việt (bí danh của TACHHO).", tachho_fn),
+        f!("PROPER_VN", 1, 1, Text, S, "PROPER_VN(text)", "Chuẩn hóa viết hoa chữ cái đầu mỗi từ tiếng Việt.", proper_vn_fn),
+        f!("TCVN3_TO_UNICODE", 1, 1, Text, S, "TCVN3_TO_UNICODE(text)", "Chuyển đổi văn bản mã TCVN3 (.VnTime/ABC) sang Unicode chuẩn.", tcvn3_to_unicode_fn),
+        f!("CONVERT_TCVN3", 1, 1, Text, S, "CONVERT_TCVN3(text)", "Chuyển đổi văn bản mã TCVN3 (.VnTime/ABC) sang Unicode chuẩn (bí danh).", tcvn3_to_unicode_fn),
+        f!("UNICODE_TO_TCVN3", 1, 1, Text, S, "UNICODE_TO_TCVN3(text)", "Chuyển đổi văn bản Unicode chuẩn sang bảng mã TCVN3 (.VnTime/ABC).", unicode_to_tcvn3_fn),
         f!("CONCATENATE", 1, VAR, Text, S, "CONCATENATE(text1, [text2], ...)", "Joins several text values into one.", concatenate),
         f!("CONCAT", 1, VAR, Text, A, "CONCAT(text1, [text2], ...)", "Joins text from values and every cell of ranges, without a separator.", concat),
         f!(
@@ -1351,5 +1387,21 @@ mod tests {
         is_text(ev("DOCSO", vec![n(21.0), t("")]), "Hai mươi mốt");
         is_text(ev("VND_TEXT", vec![n(105.0), t("VND")]), "Một trăm lẻ năm VND");
         is_text(ev("DOCSO", vec![n(-50000.0)]), "Âm năm mươi nghìn đồng chẵn");
+
+        is_text(ev("TACHTEN", vec![t("Nguyễn Văn An")]), "An");
+        is_text(ev("GET_FIRST_NAME", vec![t("Đặng Thị Thu Hà")]), "Hà");
+        is_text(ev("TACHTEN", vec![t("John")]), "John");
+        is_text(ev("TACHTEN", vec![t("")]), "");
+
+        is_text(ev("TACHHO", vec![t("Nguyễn Văn An")]), "Nguyễn Văn");
+        is_text(ev("GET_LAST_NAME", vec![t("Đặng Thị Thu Hà")]), "Đặng Thị Thu");
+        is_text(ev("TACHHO", vec![t("John")]), "");
+
+        is_text(ev("PROPER_VN", vec![t("nguyễn văn an")]), "Nguyễn Văn An");
+        is_text(ev("PROPER_VN", vec![t("ĐẶNG THỊ THU HÀ")]), "Đặng Thị Thu Hà");
+
+        is_text(ev("TCVN3_TO_UNICODE", vec![t("hép møt tÕt")]), "hộp mứt tết");
+        is_text(ev("CONVERT_TCVN3", vec![t("Céng hoµ x· héi chñ nghÜa ViÖt Nam")]), "Cộng hoà xã hội chủ nghĩa Việt Nam");
+        is_text(ev("UNICODE_TO_TCVN3", vec![t("hộp mứt tết")]), "hép møt tÕt");
     }
 }
