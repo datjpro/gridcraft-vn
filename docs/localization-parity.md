@@ -54,7 +54,7 @@ separators, number/date formats, machine translation with agent review, and scri
 | Japanese | ja | 268 (~12%) | no | CJK system-font fallback; IME unverified; no furigana display | no | menus only | 8–12 h |
 | German | de | 266 (~12%) | no | Latin: yes | no | menus only | 4–8 h |
 | Korean | ko | 266 (~12%) | no | Hangul via the CJK fallback; IME unverified | no | menus only | 6–10 h |
-| Vietnamese | vi | 0 (0%) | no | Latin with stacked diacritics: unverified | no | none | 6–10 h |
+| Vietnamese | vi | 440 (~20%) | dialogs and menus | Latin: yes | no | menus, File view, dialogs | 3–5 h |
 
 Other shipped languages: Russian (ru) and German (de), 266 labels each (~12%), menus only.
 
